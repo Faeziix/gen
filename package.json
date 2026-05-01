@@ -1,0 +1,21 @@
+{
+  "name": "gen",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "gen": "./bin/gen.ts"
+  },
+  "scripts": {
+    "start": "bun bin/gen.ts"
+  },
+  "dependencies": {
+    "@google/genai": "^1.0.0",
+    "commander": "^13.1.0",
+    "kleur": "^4.1.5",
+    "mime": "^4.0.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.0.0"
+  }
+}
