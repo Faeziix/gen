@@ -17,6 +17,7 @@
 - Use `bun` always, never npm/npx
 - No .env loader — GEMINI_API_KEY must be exported in shell
 - Output images go to `out/` by default (gitignored)
+- Default model: `gemini-3-pro-image-preview`
 - Model commentary streamed to stderr; file paths printed to stdout
 
 ## Patterns & Conventions

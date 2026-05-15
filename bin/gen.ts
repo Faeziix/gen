@@ -12,7 +12,7 @@ program
   .option("-i, --image <path...>", "Reference image(s) — repeatable")
   .option("-o, --out <path>", "Output path prefix", `out/gen-${Date.now()}`)
   .option("-n, --count <n>", "Number of variants to generate", "1")
-  .option("-m, --model <id>", "Gemini model ID", "gemini-3.1-flash-image-preview")
+  .option("-m, --model <id>", "Gemini model ID", "gemini-3-pro-image-preview")
   .option("-a, --aspect <ratio>", "Aspect ratio, e.g. 1:1, 16:9, 9:16, 21:9")
   .option("-s, --size <size>", "Image size: 1K, 2K, or 4K", "1K")
   .option("--stdin", "Read prompt from stdin")
