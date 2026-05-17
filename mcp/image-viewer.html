@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Generated Image</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        background: #0d0d0d;
+        color: #fff;
+        font-family: system-ui, -apple-system, sans-serif;
+        padding: 12px;
+      }
+
+      #loading {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 32px 0;
+        color: #888;
+        font-size: 14px;
+      }
+
+      .spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid #333;
+        border-top-color: #888;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        flex-shrink: 0;
+      }
+
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      #content { display: none; }
+
+      .chips {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 10px;
+        flex-wrap: wrap;
+      }
+
+      .chip {
+        background: #1e1e1e;
+        border: 1px solid #2a2a2a;
+        border-radius: 20px;
+        padding: 3px 10px;
+        font-size: 12px;
+        color: #aaa;
+      }
+
+      .gallery {
+        display: grid;
+        gap: 8px;
+      }
+
+      .gallery.multi { grid-template-columns: 1fr 1fr; }
+
+      .gallery img {
+        width: 100%;
+        border-radius: 8px;
+        display: block;
+        cursor: pointer;
+        transition: opacity 0.15s;
+      }
+
+      .gallery img:hover { opacity: 0.9; }
+
+      .actions {
+        margin-top: 10px;
+        display: flex;
+        gap: 8px;
+      }
+
+      button {
+        background: #1e1e1e;
+        color: #ddd;
+        border: 1px solid #2a2a2a;
+        padding: 7px 14px;
+        cursor: pointer;
+        border-radius: 8px;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: background 0.15s;
+      }
+
+      button:hover { background: #2a2a2a; }
+      button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+      #error {
+        color: #f88;
+        font-size: 13px;
+        padding: 8px 0;
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="loading">
+      <div class="spinner"></div>
+      Generating…
+    </div>
+
+    <div id="content">
+      <div class="chips" id="chips"></div>
+      <div class="gallery" id="gallery"></div>
+      <div class="actions">
+        <button id="regen">↺ Regenerate</button>
+      </div>
+      <div id="error"></div>
+    </div>
+
+    <script type="module" src="/mcp/image-viewer-app.ts"></script>
+  </body>
+</html>

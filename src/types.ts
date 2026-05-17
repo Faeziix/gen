@@ -7,4 +7,6 @@ export interface GenerateOptions {
   aspect: string;
   size: string;
   json: boolean;
+  thinking?: "minimal" | "high";
+  showThoughts?: boolean;
 }

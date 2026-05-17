@@ -1,0 +1,8 @@
+{
+  "buildCommand": "echo 'no build needed'",
+  "functions": {
+    "api/mcp.ts": {
+      "maxDuration": 240
+    }
+  }
+}

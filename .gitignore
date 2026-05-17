@@ -2,3 +2,7 @@ node_modules/
 out/
 dist/
 *.local
+public/images/*
+!public/images/.gitkeep
+.vercel
+.env*.local

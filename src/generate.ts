@@ -11,17 +11,23 @@ export async function generate(opts: GenerateOptions): Promise<string[]> {
   const parts = [...imageParts, { text: opts.prompt }];
   const contents = [{ role: "user", parts }];
 
-  const config = {
+  const config: Record<string, unknown> = {
     responseModalities: ["IMAGE", "TEXT"],
     imageConfig: {
       ...(opts.aspect ? { aspectRatio: opts.aspect } : {}),
       imageSize: opts.size,
     },
+    ...(opts.thinking || opts.showThoughts
+      ? {
+          thinkingConfig: {
+            ...(opts.thinking ? { thinkingLevel: opts.thinking } : {}),
+            ...(opts.showThoughts ? { includeThoughts: true } : {}),
+          },
+        }
+      : {}),
   };
 
-  const allFiles: string[] = [];
-
-  for (let run = 0; run < opts.count; run++) {
+  async function runOne(run: number): Promise<string[]> {
     if (opts.count > 1 && !opts.json) {
       process.stderr.write(kleur.dim(`[${run + 1}/${opts.count}] generating...\n`));
     }
@@ -32,6 +38,7 @@ export async function generate(opts: GenerateOptions): Promise<string[]> {
       contents,
     });
 
+    const files: string[] = [];
     let fileIndex = 0;
 
     for await (const chunk of response) {
@@ -44,7 +51,7 @@ export async function generate(opts: GenerateOptions): Promise<string[]> {
           const outPath = `${opts.out}${suffix}.${ext}`;
           const buffer = Buffer.from(part.inlineData.data ?? "", "base64");
           saveBinary(outPath, buffer);
-          allFiles.push(outPath);
+          files.push(outPath);
           if (!opts.json) {
             process.stderr.write(kleur.green(`saved: ${outPath}\n`));
           }
@@ -54,7 +61,13 @@ export async function generate(opts: GenerateOptions): Promise<string[]> {
         }
       }
     }
+
+    return files;
   }
 
-  return allFiles;
+  const results = await Promise.all(
+    Array.from({ length: opts.count }, (_, i) => runOne(i)),
+  );
+
+  return results.flat();
 }

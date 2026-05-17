@@ -6,16 +6,28 @@
     "gen": "./bin/gen.ts"
   },
   "scripts": {
-    "start": "bun bin/gen.ts"
+    "start": "bun bin/gen.ts",
+    "mcp": "bun mcp/server.ts",
+    "mcp:dev": "bun --watch mcp/server.ts",
+    "build:ui": "INPUT=mcp/image-viewer.html bunx vite build",
+    "vercel-build": "bun run build:ui"
   },
   "dependencies": {
     "@google/genai": "^1.0.0",
+    "@modelcontextprotocol/ext-apps": "^1.7.1",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@vercel/blob": "^2.3.3",
     "commander": "^13.1.0",
+    "express": "^5.2.1",
     "kleur": "^4.1.5",
-    "mime": "^4.0.4"
+    "mime": "^4.0.4",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
     "@types/node": "^22.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vite": "^8.0.13",
+    "vite-plugin-singlefile": "^2.3.3"
   }
 }
