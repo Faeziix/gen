@@ -39,7 +39,7 @@ program
     let prompt = promptArg ?? "";
 
     if (options.stdin) {
-      prompt = readFileSync("/dev/stdin", "utf8").trim();
+      prompt = readFileSync(process.stdin.fd, "utf8").trim();
     }
 
     if (!prompt) {
