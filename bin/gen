@@ -20,12 +20,14 @@ SHOW_THOUGHTS=false
 USE_STDIN=false
 JSON_OUT=false
 PROMPT=""
+API_KEY="${GEMINI_API_KEY:-}"
 
 usage() {
   cat >&2 <<EOF
 Usage: gen [prompt] [options]
 
 Options:
+  -k <key>        Gemini API key (overrides GEMINI_API_KEY env var)
   -i <path>       Reference image (repeatable)
   -o <prefix>     Output path prefix (default: out/gen-<ts>)
   -n <n>          Number of variants (default: 1)
@@ -77,6 +79,7 @@ ext_from_mime() {
 # ---------------------------------------------------------------------------
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    -k) API_KEY="$2"; shift 2 ;;
     -i) IMAGES+=("$2"); shift 2 ;;
     -o) OUT="$2"; shift 2 ;;
     -n) COUNT="$2"; shift 2 ;;
@@ -102,8 +105,8 @@ if [[ -z "$PROMPT" ]]; then
   exit 1
 fi
 
-if [[ -z "${GEMINI_API_KEY:-}" ]]; then
-  echo "GEMINI_API_KEY not set. Export it before running gen." >&2
+if [[ -z "$API_KEY" ]]; then
+  echo "API key required. Set GEMINI_API_KEY or pass -k <key>." >&2
   exit 1
 fi
 
@@ -177,7 +180,7 @@ run_one() {
   local request_json
   request_json=$(build_request_json "$parts_json")
 
-  local url="${API_BASE}/${MODEL}:generateContent?key=${GEMINI_API_KEY}"
+  local url="${API_BASE}/${MODEL}:generateContent?key=${API_KEY}"
 
   local response
   response=$(curl -sS -X POST "$url" \
