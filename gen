@@ -1,0 +1,284 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ---------------------------------------------------------------------------
+# gen — AI image generation via Gemini REST API
+# Dependencies: curl, jq, base64 (all standard on macOS/Linux)
+# Usage: GEMINI_API_KEY=... gen "prompt" [options]
+# ---------------------------------------------------------------------------
+
+API_BASE="https://generativelanguage.googleapis.com/v1beta/models"
+
+declare -a IMAGES=()
+OUT=""
+COUNT=1
+MODEL="gemini-3.1-flash-image-preview"
+ASPECT=""
+SIZE="1K"
+THINKING=""
+SHOW_THOUGHTS=false
+USE_STDIN=false
+JSON_OUT=false
+PROMPT=""
+
+usage() {
+  cat >&2 <<EOF
+Usage: gen [prompt] [options]
+
+Options:
+  -i <path>       Reference image (repeatable)
+  -o <prefix>     Output path prefix (default: out/gen-<ts>)
+  -n <n>          Number of variants (default: 1)
+  -m <model>      Model alias or full ID
+                  Aliases: flash, pro, flash25
+  -a <ratio>      Aspect ratio: 1:1 2:3 3:2 3:4 4:3 4:5 5:4 9:16 16:9 21:9
+  -s <size>       Image size: 512 1K 2K 4K (default: 1K)
+  --thinking <l>  Thinking level: minimal or high (flash only)
+  --show-thoughts Print model thoughts to stderr (flash only)
+  --stdin         Read prompt from stdin
+  --json          Output JSON { "files": [...] }
+  -h, --help      Show this help
+EOF
+  exit 1
+}
+
+resolve_model() {
+  case "$1" in
+    flash)   echo "gemini-3.1-flash-image-preview" ;;
+    pro)     echo "gemini-3-pro-image-preview" ;;
+    flash25) echo "gemini-2.5-flash-image" ;;
+    *)       echo "$1" ;;
+  esac
+}
+
+mime_from_ext() {
+  case "${1##*.}" in
+    jpg|jpeg) echo "image/jpeg" ;;
+    png)      echo "image/png" ;;
+    gif)      echo "image/gif" ;;
+    webp)     echo "image/webp" ;;
+    bmp)      echo "image/bmp" ;;
+    *)        echo "image/png" ;;
+  esac
+}
+
+ext_from_mime() {
+  case "$1" in
+    image/jpeg) echo "jpg" ;;
+    image/png)  echo "png" ;;
+    image/gif)  echo "gif" ;;
+    image/webp) echo "webp" ;;
+    *)          echo "png" ;;
+  esac
+}
+
+# ---------------------------------------------------------------------------
+# Arg parsing (supports long opts manually)
+# ---------------------------------------------------------------------------
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -i) IMAGES+=("$2"); shift 2 ;;
+    -o) OUT="$2"; shift 2 ;;
+    -n) COUNT="$2"; shift 2 ;;
+    -m) MODEL="$2"; shift 2 ;;
+    -a) ASPECT="$2"; shift 2 ;;
+    -s) SIZE="$2"; shift 2 ;;
+    --thinking) THINKING="$2"; shift 2 ;;
+    --show-thoughts) SHOW_THOUGHTS=true; shift ;;
+    --stdin) USE_STDIN=true; shift ;;
+    --json) JSON_OUT=true; shift ;;
+    -h|--help) usage ;;
+    -*) echo "Unknown option: $1" >&2; usage ;;
+    *) PROMPT="$1"; shift ;;
+  esac
+done
+
+if [[ "$USE_STDIN" == true ]]; then
+  PROMPT=$(cat)
+fi
+
+if [[ -z "$PROMPT" ]]; then
+  echo "Prompt required. Pass as argument or use --stdin." >&2
+  exit 1
+fi
+
+if [[ -z "${GEMINI_API_KEY:-}" ]]; then
+  echo "GEMINI_API_KEY not set. Export it before running gen." >&2
+  exit 1
+fi
+
+if [[ -z "$OUT" ]]; then
+  OUT="out/gen-$(date +%s%3N)"
+fi
+
+MODEL=$(resolve_model "$MODEL")
+
+# ---------------------------------------------------------------------------
+# Build JSON parts array
+# ---------------------------------------------------------------------------
+build_parts_json() {
+  local parts_json="[]"
+
+  for img in "${IMAGES[@]+"${IMAGES[@]}"}"; do
+    if [[ ! -f "$img" ]]; then
+      echo "Image not found: $img" >&2; exit 1
+    fi
+    local mime
+    mime=$(mime_from_ext "$img")
+    local b64
+    b64=$(base64 < "$img" | tr -d '\n')
+    parts_json=$(echo "$parts_json" | jq \
+      --arg mime "$mime" \
+      --arg data "$b64" \
+      '. + [{"inlineData": {"mimeType": $mime, "data": $data}}]')
+  done
+
+  parts_json=$(echo "$parts_json" | jq --arg text "$PROMPT" '. + [{"text": $text}]')
+  echo "$parts_json"
+}
+
+build_request_json() {
+  local parts_json="$1"
+
+  local image_config
+  image_config=$(jq -n --arg size "$SIZE" '{"imageSize": $size}')
+  if [[ -n "$ASPECT" ]]; then
+    image_config=$(echo "$image_config" | jq --arg a "$ASPECT" '. + {"aspectRatio": $a}')
+  fi
+
+  local config
+  config=$(jq -n \
+    --argjson ic "$image_config" \
+    '{"responseModalities": ["IMAGE", "TEXT"], "imageConfig": $ic}')
+
+  if [[ -n "$THINKING" || "$SHOW_THOUGHTS" == true ]]; then
+    local tc="{}"
+    if [[ -n "$THINKING" ]]; then
+      tc=$(echo "$tc" | jq --arg l "$THINKING" '. + {"thinkingLevel": $l}')
+    fi
+    if [[ "$SHOW_THOUGHTS" == true ]]; then
+      tc=$(echo "$tc" | jq '. + {"includeThoughts": true}')
+    fi
+    config=$(echo "$config" | jq --argjson tc "$tc" '. + {"thinkingConfig": $tc}')
+  fi
+
+  jq -n \
+    --argjson parts "$parts_json" \
+    --argjson config "$config" \
+    '{"contents": [{"role": "user", "parts": $parts}], "generationConfig": $config}'
+}
+
+# ---------------------------------------------------------------------------
+# Run one generation, save images, echo saved paths
+# ---------------------------------------------------------------------------
+run_one() {
+  local run="$1"
+  local parts_json="$2"
+  local request_json
+  request_json=$(build_request_json "$parts_json")
+
+  local url="${API_BASE}/${MODEL}:generateContent?key=${GEMINI_API_KEY}"
+
+  local response
+  response=$(curl -sS -X POST "$url" \
+    -H "Content-Type: application/json" \
+    -d "$request_json")
+
+  local error
+  error=$(echo "$response" | jq -r '.error.message // empty')
+  if [[ -n "$error" ]]; then
+    echo "API error: $error" >&2
+    exit 1
+  fi
+
+  local parts_out
+  parts_out=$(echo "$response" | jq -c '.candidates[0].content.parts[]?')
+
+  local file_index=0
+  local saved_files=()
+
+  while IFS= read -r part; do
+    local mime_type
+    mime_type=$(echo "$part" | jq -r '.inlineData.mimeType // empty')
+
+    if [[ -n "$mime_type" ]]; then
+      local ext
+      ext=$(ext_from_mime "$mime_type")
+      local suffix=""
+      if [[ "$COUNT" -gt 1 ]]; then
+        suffix="-${run}-${file_index}"
+      elif [[ "$file_index" -gt 0 ]]; then
+        suffix="-${file_index}"
+      fi
+      local out_path="${OUT}${suffix}.${ext}"
+      mkdir -p "$(dirname "$out_path")"
+      echo "$part" | jq -r '.inlineData.data' | base64 -d > "$out_path"
+      saved_files+=("$out_path")
+      if [[ "$JSON_OUT" == false ]]; then
+        printf '\033[32msaved: %s\033[0m\n' "$out_path" >&2
+      fi
+      file_index=$((file_index + 1))
+    else
+      local text
+      text=$(echo "$part" | jq -r '.text // empty')
+      if [[ -n "$text" ]]; then
+        if [[ "$SHOW_THOUGHTS" == true || "$THINKING" == "" ]] && [[ "$JSON_OUT" == false ]]; then
+          printf '\033[2mmodel: %s\033[0m\n' "$text" >&2
+        fi
+      fi
+    fi
+  done <<< "$parts_out"
+
+  for f in "${saved_files[@]+"${saved_files[@]}"}"; do
+    echo "$f"
+  done
+}
+
+# ---------------------------------------------------------------------------
+# Main — parallel runs if count > 1
+# ---------------------------------------------------------------------------
+PARTS_JSON=$(build_parts_json)
+
+declare -a ALL_FILES=()
+declare -a TMPFILES=()
+
+cleanup() {
+  for t in "${TMPFILES[@]+"${TMPFILES[@]}"}"; do
+    rm -f "$t"
+  done
+}
+trap cleanup EXIT
+
+if [[ "$COUNT" -eq 1 ]]; then
+  tmp=$(mktemp)
+  TMPFILES+=("$tmp")
+  run_one 0 "$PARTS_JSON" > "$tmp"
+  mapfile -t ALL_FILES < "$tmp"
+else
+  declare -a PIDS=()
+  for ((i = 0; i < COUNT; i++)); do
+    if [[ "$JSON_OUT" == false ]]; then
+      printf '\033[2m[%d/%d] generating...\033[0m\n' "$((i+1))" "$COUNT" >&2
+    fi
+    tmp=$(mktemp)
+    TMPFILES+=("$tmp")
+    run_one "$i" "$PARTS_JSON" > "$tmp" &
+    PIDS+=("$!")
+  done
+  for pid in "${PIDS[@]}"; do
+    wait "$pid"
+  done
+  for tmp in "${TMPFILES[@]}"; do
+    while IFS= read -r line; do
+      ALL_FILES+=("$line")
+    done < "$tmp"
+  done
+fi
+
+if [[ "$JSON_OUT" == true ]]; then
+  jq -n --argjson files "$(printf '%s\n' "${ALL_FILES[@]+"${ALL_FILES[@]}"}" | jq -R . | jq -s .)" '{"files": $files}'
+else
+  for f in "${ALL_FILES[@]+"${ALL_FILES[@]}"}"; do
+    echo "$f"
+  done
+fi
