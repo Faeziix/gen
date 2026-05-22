@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "bin": {
-    "gen": "./bin/gen.ts"
+    "gen": "./bin/gen"
   },
   "scripts": {
     "start": "bun bin/gen.ts",

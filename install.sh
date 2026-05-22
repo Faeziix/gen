@@ -15,7 +15,7 @@ done
 mkdir -p "$INSTALL_DIR"
 
 echo "Installing gen to $INSTALL_DIR/$SCRIPT ..."
-curl -fsSL "https://raw.githubusercontent.com/$REPO/main/$SCRIPT" -o "$INSTALL_DIR/$SCRIPT"
+curl -fsSL "https://raw.githubusercontent.com/$REPO/main/bin/$SCRIPT" -o "$INSTALL_DIR/$SCRIPT"
 chmod +x "$INSTALL_DIR/$SCRIPT"
 
 if ! echo "$PATH" | tr ':' '\n' | grep -qx "$INSTALL_DIR"; then
