@@ -39,7 +39,7 @@ Options:
   --json          Output JSON { "files": [...] }
   -h, --help      Show this help
 EOF
-  exit 1
+  exit 0
 }
 
 resolve_model() {
