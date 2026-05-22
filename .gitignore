@@ -6,3 +6,4 @@ public/images/*
 !public/images/.gitkeep
 .vercel
 .env*.local
+go/gen
